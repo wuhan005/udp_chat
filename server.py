@@ -27,6 +27,7 @@ UDP Server
         self.add_handler("connect", self.connect)
         self.add_handler('register', self.register)
         self.add_handler('login', self.login)
+        self.add_handler('logout', self.logout)
 
     # 返回消息给客户端
     def send_to(self, addr, data):
@@ -77,6 +78,20 @@ UDP Server
         self.user_data[account]['token'] = token
         print('用户登录成功：%s - %s' % (account, token))
         return send_token(token)
+
+    # Handler: 用户登出
+    def logout(self, addr, body):
+        account = body['account']
+        token = body['token']
+
+        # 判断用户名，Token 是否正确
+        if account not in self.user_data or self.user_data[account]['token'] != token:
+            return error("用户名不存在")
+
+        # 删除 Token
+        del self.user_data[account]['token']
+        print('用户登出：%s' % account)
+        return ok(body)
 
 
 def start():

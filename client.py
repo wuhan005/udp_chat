@@ -1,11 +1,12 @@
 import socket
 
 from msg import *
-from util import warp, parse
+from util import *
 
 
 class Client:
     login_status = False
+    account = ''
     token = ''
 
     def __init__(self, ip: str, port: int):
@@ -20,6 +21,7 @@ class Client:
 
     def menu(self):
         while True:
+            clear()
             print("====菜单====")
             print("1. 注册")
 
@@ -77,6 +79,7 @@ class Client:
                 continue
             elif message_type == 'send_token':
                 # 保存 Token，更新登录状态
+                self.account = account
                 self.token = message_body
                 self.login_status = True
                 print('[ - ] 登录成功')
@@ -87,17 +90,22 @@ class Client:
     # 用户登出
     def logout(self):
         while True:
-            message_type, message_body = self.send(logout(self.token))
+            logout_payload = {
+                'account': self.account,
+                'token': self.token
+            }
+            message_type, message_body = self.send(logout(logout_payload))
             if message_type == 'error':
                 print('[ x ] ' + message_body)
                 continue
             if message_type != 'ok':
                 raise Exception("意外的返回消息类型 " + message_type)
-            if message_body != check_code(self.token):
+            if message_body != check_code(logout_payload):
                 raise Exception("错误的消息校验码")
 
             # 清除 Token，更新登录状态
-            self.token = ""
+            self.token = ''
+            self.account = ''
             self.login_status = False
             print("登出成功！")
             break

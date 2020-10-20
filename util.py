@@ -1,5 +1,6 @@
 import json
 import hashlib
+import os
 
 
 # 解析消息体
@@ -28,3 +29,8 @@ def md5(string):
     m = hashlib.md5()
     m.update(string.encode('utf-8'))
     return m.hexdigest()
+
+
+# 清屏
+def clear():
+    os.system('clear')

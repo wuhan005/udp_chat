@@ -14,8 +14,8 @@ def login(data):
     return warp("login", data)
 
 
-def logout(token):
-    return warp("logout", token)
+def logout(data):
+    return warp("logout", data)
 
 
 # welcome 服务端欢迎信息
