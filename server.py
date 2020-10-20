@@ -1,11 +1,15 @@
 import socket
 
 import datetime
+import json
+import time
 from msg import *
-from util import parse
+from util import parse, md5
 
 
 class Server:
+    salt = 'here_is_very_s3cret_s@lt'
+
     welcome_msg = '''
 UDP Server
 
@@ -14,12 +18,15 @@ UDP Server
     '''
 
     handlers = {}
+    user_data = {}
 
     def __init__(self, ip: str, port: int):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((ip, port))
 
         self.add_handler("connect", self.connect)
+        self.add_handler('register', self.register)
+        self.add_handler('login', self.login)
 
     # 返回消息给客户端
     def send_to(self, addr, data):
@@ -41,6 +48,35 @@ UDP Server
     # Handler: 新的客户端
     def connect(self, addr, body):
         return welcome(self.welcome_msg % datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
+    # Handler: 用户注册
+    def register(self, addr, body):
+        account = body['account']
+        password = body['password']
+
+        # 判断用户名是否重复
+        if account in self.user_data:
+            return error("用户名重复，换一个名字吧~")
+
+        # 存储用户信息
+        self.user_data[account] = {'password': password}
+        print('新用户注册：%s' % account)
+        return ok(body)
+
+    # Handler: 用户登录
+    def login(self, addr, body):
+        account = body['account']
+        password = body['password']
+
+        # 判断用户名是否重复
+        if account not in self.user_data or self.user_data[account]['password'] != password:
+            return error("用户名或密码错误")
+
+        # 签发用户 Token
+        token = md5(str(time.time()) + account + self.salt)
+        self.user_data[account]['token'] = token
+        print('用户登录成功：%s - %s' % (account, token))
+        return send_token(token)
 
 
 def start():
