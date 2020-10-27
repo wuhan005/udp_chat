@@ -42,6 +42,8 @@ class Client:
                     self.login()
                 else:
                     self.logout()
+            elif choice == '3' and self.login_status is True:
+                self.group()
 
     # 用户注册
     def register(self):
@@ -110,10 +112,69 @@ class Client:
             print("登出成功！")
             break
 
-    # # 群聊
-    # def group(self):
-    #     while True:
-    #         self.socket.
+    # 群聊
+    def group(self):
+        clear()
+
+        if not self.login_status:
+            raise Exception('未登录')
+
+        group_payload = {
+            'account': self.account,
+            'token': self.token,
+        }
+
+        # 发送进入聊天室信息
+        message_type, message_body = self.send(enter_group(group_payload))
+        if message_type == 'error':
+            print('[ x ] ' + message_body)
+            return
+        if message_type != 'ok':
+            raise Exception("意外的返回消息类型 " + message_type)
+        if message_body != check_code(group_payload):
+            raise Exception("错误的消息校验码")
+
+        print('[ - ] 进入公共聊天室，输入 /exit 退出')
+
+        # 另起一个线程读取收到的消息
+
+        while True:
+            msg = input()
+
+            if msg == '/exit':
+                break
+
+        # 发送退出消息
+        message_type, message_body = self.send(exit_group(group_payload))
+        if message_type == 'error':
+            print('[ x ] ' + message_body)
+            return
+        if message_type != 'ok':
+            raise Exception("意外的返回消息类型 " + message_type)
+        if message_body != check_code(group_payload):
+            raise Exception("错误的消息校验码")
+
+        print('[ - ] 退出公共聊天室')
+
+    # 私聊
+    def private(self):
+        clear()
+        target = input('输入聊天目标账号：')
+        ask_private_payload = {
+            'account': self.account,
+            'token': self.token,
+            'target': target,
+        }
+        message_type, message_body = self.send(ask_private(ask_private_payload))
+        if message_type == 'error':
+            print('[ x ] ' + message_body)
+            return
+        if message_type != 'ok':
+            raise Exception("意外的返回消息类型 " + message_type)
+        if message_body != check_code(ask_private_payload):
+            raise Exception("错误的消息校验码")
+
+        print('[ - ] 开始聊天吧~')
 
 
 server_ip = '127.0.0.1'

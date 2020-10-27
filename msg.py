@@ -1,21 +1,39 @@
 from util import warp, check_code
 
 
-# connect 新的连接
+# 客户端建立新的连接
 def connect():
     return warp("connect", "")
 
 
+# 客户端注册
 def register(data):
     return warp("register", data)
 
 
+# 客户端登录
 def login(data):
     return warp("login", data)
 
 
+# 客户端登出
 def logout(data):
     return warp("logout", data)
+
+
+# 客户端进入群聊
+def enter_group(data):
+    return warp("enter_group", data)
+
+
+# 客户端退出群聊
+def exit_group(data):
+    return warp("exit_group", data)
+
+
+# 客户端发起私聊
+def ask_private(data):
+    return warp("ask_private", data)
 
 
 # welcome 服务端欢迎信息
