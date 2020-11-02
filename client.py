@@ -1,4 +1,6 @@
 import socket
+import threading
+import time
 
 from msg import *
 from util import *
@@ -6,6 +8,7 @@ from util import *
 
 class Client:
     login_status = False
+    group_status = False
     account = ''
     token = ''
 
@@ -18,6 +21,10 @@ class Client:
         self.socket.sendto(data, self.server)
         receive_data, addr = self.socket.recvfrom(1024)
         return parse(receive_data)
+
+    # 发送信息，不处理返回
+    def just_send(self, data):
+        self.socket.sendto(data, self.server)
 
     def menu(self):
         while True:
@@ -44,6 +51,7 @@ class Client:
                     self.logout()
             elif choice == '3' and self.login_status is True:
                 self.group()
+                print(1111111)
 
     # 用户注册
     def register(self):
@@ -134,25 +142,39 @@ class Client:
         if message_body != check_code(group_payload):
             raise Exception("错误的消息校验码")
 
-        print('[ - ] 进入公共聊天室，输入 /exit 退出')
+        self.group_status = True
 
-        # 另起一个线程读取收到的消息
+        # 另起一个线程开始读取收到的消息
+        group_thread = threading.Thread(target=self.receive_group_message)
+        group_thread.start()
 
         while True:
             msg = input()
 
+            group_message_payload = {
+                'account': self.account,
+                'token': self.token,
+                'message': msg
+            }
+
             if msg == '/exit':
+                self.group_status = False
                 break
 
+            # 不接收处理响应
+            self.just_send(group_message(group_message_payload))
+
         # 发送退出消息
-        message_type, message_body = self.send(exit_group(group_payload))
-        if message_type == 'error':
-            print('[ x ] ' + message_body)
-            return
-        if message_type != 'ok':
-            raise Exception("意外的返回消息类型 " + message_type)
-        if message_body != check_code(group_payload):
-            raise Exception("错误的消息校验码")
+        self.just_send(exit_group(group_payload))
+
+    def receive_group_message(self):
+        print('[ - ] 进入公共聊天室，输入 /exit 退出')
+        while True and self.group_status:
+            receive_data, addr = self.socket.recvfrom(1024)
+            data_type, receive_data = parse(receive_data)
+            if data_type == 'receive_group_message':
+                print("[%s] %s: %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), receive_data['from'],
+                                       receive_data['message']))
 
         print('[ - ] 退出公共聊天室')
 

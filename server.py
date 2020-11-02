@@ -30,6 +30,7 @@ UDP Server
         self.add_handler('login', self.login)
         self.add_handler('logout', self.logout)
         self.add_handler('enter_group', self.enter_group)
+        self.add_handler('group_message', self.group_message)
         self.add_handler('exit_group', self.exit_group)
 
     # 返回消息给客户端
@@ -112,6 +113,30 @@ UDP Server
         self.group_chat[account] = token
 
         print('用户 %s 进入群聊' % account)
+        return ok(body)
+
+    # Handler: 用户发送群聊消息
+    def group_message(self, addr, body):
+        account = body['account']
+        token = body['token']
+        message = body['message']
+
+        # 判断用户名，Token 是否正确
+        if account not in self.user_data or self.user_data[account]['token'] != token:
+            return error("用户名不存在")
+
+        # 如果当前用户意外不在群聊名单里，则加上
+        self.group_chat[account] = token
+
+        # 广播群聊消息
+        for to_account in self.group_chat:
+            to_addr = self.user_data[to_account]['addr']
+            self.send_to(to_addr, receive_group_message({
+                'from': account,
+                'message': message,
+            }))
+
+        print('用户 %s 发送群聊消息: %s' % (account, message))
         return ok(body)
 
     # Handler: 用户退出群聊

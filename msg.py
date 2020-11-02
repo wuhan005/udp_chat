@@ -26,6 +26,16 @@ def enter_group(data):
     return warp("enter_group", data)
 
 
+# 客户端发送群聊消息
+def group_message(data):
+    return warp("group_message", data)
+
+
+# 服务端群发群聊消息
+def receive_group_message(data):
+    return warp('receive_group_message', data)
+
+
 # 客户端退出群聊
 def exit_group(data):
     return warp("exit_group", data)
