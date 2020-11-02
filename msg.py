@@ -36,6 +36,11 @@ def receive_group_message(data):
     return warp('receive_group_message', data)
 
 
+# 服务端发送私有消息
+def receive_private_message(data):
+    return warp('receive_private_message', data)
+
+
 # 客户端退出群聊
 def exit_group(data):
     return warp("exit_group", data)
@@ -52,8 +57,11 @@ def welcome(msg):
 
 
 # 计算校验码并发送确认信息
-def ok(data):
-    return warp("ok", check_code(data))
+def ok(msg_type, data):
+    return warp("ok", {
+        'type': msg_type,
+        'code': check_code(data)
+    })
 
 
 # 操作错误消息
@@ -62,5 +70,5 @@ def error(msg):
 
 
 # 登录成功，返回 Token
-def send_token(token):
-    return warp("send_token", token)
+def send_token(data):
+    return warp("send_token", data)

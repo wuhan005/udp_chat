@@ -66,7 +66,7 @@ UDP Server
         # 存储用户信息
         self.user_data[account] = {'password': password}
         print('新用户注册：%s' % account)
-        return ok(body)
+        return ok('register', body)
 
     # Handler: 用户登录
     def login(self, addr, body):
@@ -83,7 +83,10 @@ UDP Server
         # 保存登录用户地址
         self.user_data[account]['addr'] = addr
         print('用户登录成功：%s - %s' % (account, token))
-        return send_token(token)
+        return send_token({
+            'account': account,
+            'token': token
+        })
 
     # Handler: 用户登出
     def logout(self, addr, body):
@@ -98,7 +101,7 @@ UDP Server
         del self.user_data[account]['token']
         del self.user_data[account]['addr']
         print('用户登出：%s' % account)
-        return ok(body)
+        return ok('logout', body)
 
     # Handler: 用户进入群聊
     def enter_group(self, addr, body):
@@ -113,7 +116,7 @@ UDP Server
         self.group_chat[account] = token
 
         print('用户 %s 进入群聊' % account)
-        return ok(body)
+        return ok('enter_group', body)
 
     # Handler: 用户发送群聊消息
     def group_message(self, addr, body):
@@ -137,7 +140,7 @@ UDP Server
             }))
 
         print('用户 %s 发送群聊消息: %s' % (account, message))
-        return ok(body)
+        return ok('group_message', body)
 
     # Handler: 用户退出群聊
     def exit_group(self, addr, body):
@@ -153,7 +156,28 @@ UDP Server
             del self.group_chat[account]
 
         print('用户 %s 退出群聊' % account)
-        return ok(body)
+        return ok('exit_group', body)
+
+    # Handler: 用户发送私有消息
+    def enter_private(self, addr, body):
+        account = body['account']
+        token = body['token']
+        target = body['target']
+        message = body['message']
+
+        # 判断用户名，Token 是否正确
+        if account not in self.user_data or self.user_data[account]['token'] != token:
+            return error("用户名不存在")
+
+        # 判断该用户是否存在并登陆
+        if target not in self.user_data and self.user_data[account]['addr'] != '':
+            to_addr = self.user_data[account]['addr']
+            self.send_to(to_addr, receive_private_message({
+                'from': account,
+                'message': message,
+            }))
+
+        print('用户 %s 发送私有消息给 %s: %s' % (account, target, message))
 
 
 def start():

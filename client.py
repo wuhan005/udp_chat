@@ -11,19 +11,18 @@ class Client:
     group_status = False
     account = ''
     token = ''
+    payload_queue = []
+
+    # 多线程信号量
+    login_signal = False  # 登录事件处理完毕
+    logout_signal = False  # 登出事件处理完毕
 
     def __init__(self, ip: str, port: int):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server = (ip, port)
 
-    # 发送消息并解析返回
+    # 发送消息
     def send(self, data):
-        self.socket.sendto(data, self.server)
-        receive_data, addr = self.socket.recvfrom(1024)
-        return parse(receive_data)
-
-    # 发送信息，不处理返回
-    def just_send(self, data):
         self.socket.sendto(data, self.server)
 
     def menu(self):
@@ -37,7 +36,7 @@ class Client:
             else:
                 print("2. 登出")
                 print("3. 公共聊天室【群发】")
-                print("4. 单独聊天【私发】")
+                print("4. 私发消息")
 
             print("============")
 
@@ -51,7 +50,8 @@ class Client:
                     self.logout()
             elif choice == '3' and self.login_status is True:
                 self.group()
-                print(1111111)
+            elif choice == '4' and self.login_status is True:
+                self.private_message()
 
     # 用户注册
     def register(self):
@@ -62,40 +62,23 @@ class Client:
                 'account': account,
                 'password': password
             }
-            message_type, message_body = self.send(register(register_payload))
-            if message_type == 'error':
-                print('[ x ] ' + message_body)
-                continue
-            if message_type != 'ok':
-                raise Exception("意外的返回消息类型 " + message_type)
-            if message_body != check_code(register_payload):
-                raise Exception("错误的消息校验码")
 
-            print('[ - ] 注册成功')
+            self.payload_queue.append(register_payload)
+            self.send(register(register_payload))
             break
 
     # 用户登录
     def login(self):
-        while True:
-            account = input("[ - ] 登录 请输入用户名：")
-            password = input("[ - ]登录 请输入密码：")
-            login_payload = {
-                'account': account,
-                'password': password
-            }
-            message_type, message_body = self.send(login(login_payload))
-            if message_type == 'error':
-                print('[ x ] ' + message_body)
-                continue
-            elif message_type == 'send_token':
-                # 保存 Token，更新登录状态
-                self.account = account
-                self.token = message_body
-                self.login_status = True
-                print('[ - ] 登录成功')
-                break
-            else:
-                print('[ x ] 意外的返回：%s - %s' % (message_type, message_body))
+        account = input("[ - ] 登录 请输入用户名：")
+        password = input("[ - ]登录 请输入密码：")
+        login_payload = {
+            'account': account,
+            'password': password
+        }
+        self.send(login(login_payload))
+        self.login_signal = True
+        while self.login_signal:
+            pass
 
     # 用户登出
     def logout(self):
@@ -104,14 +87,11 @@ class Client:
                 'account': self.account,
                 'token': self.token
             }
-            message_type, message_body = self.send(logout(logout_payload))
-            if message_type == 'error':
-                print('[ x ] ' + message_body)
-                continue
-            if message_type != 'ok':
-                raise Exception("意外的返回消息类型 " + message_type)
-            if message_body != check_code(logout_payload):
-                raise Exception("错误的消息校验码")
+            self.send(logout(logout_payload))
+
+            self.logout_signal = True
+            while self.logout_signal:
+                pass
 
             # 清除 Token，更新登录状态
             self.token = ''
@@ -133,20 +113,11 @@ class Client:
         }
 
         # 发送进入聊天室信息
-        message_type, message_body = self.send(enter_group(group_payload))
-        if message_type == 'error':
-            print('[ x ] ' + message_body)
-            return
-        if message_type != 'ok':
-            raise Exception("意外的返回消息类型 " + message_type)
-        if message_body != check_code(group_payload):
-            raise Exception("错误的消息校验码")
+        self.payload_queue.append(group_payload)
+        self.send(enter_group(group_payload))
 
         self.group_status = True
-
-        # 另起一个线程开始读取收到的消息
-        group_thread = threading.Thread(target=self.receive_group_message)
-        group_thread.start()
+        print('[ - ] 进入公共聊天室，输入 /exit 退出')
 
         while True:
             msg = input()
@@ -161,31 +132,74 @@ class Client:
                 self.group_status = False
                 break
 
-            # 不接收处理响应
-            self.just_send(group_message(group_message_payload))
+            self.payload_queue.append(group_message_payload)
+            self.send(group_message(group_message_payload))
 
         # 发送退出消息
-        self.just_send(exit_group(group_payload))
+        self.payload_queue.append(group_payload)
+        self.send(exit_group(group_payload))
 
-    def receive_group_message(self):
-        print('[ - ] 进入公共聊天室，输入 /exit 退出')
-        while True and self.group_status:
+    # 接受服务端消息处理器
+    def receive_message_handler(self):
+        while True:
             receive_data, addr = self.socket.recvfrom(1024)
             data_type, receive_data = parse(receive_data)
-            if data_type == 'receive_group_message':
+            # 服务端报文确认消息，遍历报文队列进行匹配
+            if data_type == 'ok':
+                ok_flag = False
+                for i in range(len(self.payload_queue)):
+                    p = self.payload_queue[i]
+                    if check_code(p) == receive_data['code']:
+                        ok_flag = True
+                        # 从报文队列中剔除
+                        del self.payload_queue[i]
+                        break
+
+                if receive_data['type'] == 'logout':
+                    self.logout_signal = False
+
+                if ok_flag is False:
+                    raise Exception("错误的消息校验码" + receive_data['code'])
+
+            # 错误消息
+            elif data_type == 'error':
+                # FIXME dirty code
+                if receive_data == '用户名或密码错误':
+                    self.login_signal = False  # 更新信号量
+                print('[ x ] ' + receive_data)
+
+            # 接收到服务器下发的 Token
+            elif data_type == 'send_token':
+                # 保存 Token，更新登录状态
+                self.account = receive_data['account']
+                self.token = receive_data['token']
+                self.login_status = True
+                self.login_signal = False  # 更新信号量
+                print('[ - ] 登录成功')
+
+            # 进入群聊后接收群聊消息
+            elif data_type == 'receive_group_message' and self.group_status:
                 print("[%s] %s: %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), receive_data['from'],
                                        receive_data['message']))
 
-        print('[ - ] 退出公共聊天室')
+            # 登录欢迎消息
+            elif data_type == 'welcome':
+                print("[ - ] 成功连接服务器")
+                print(receive_data)
 
-    # 私聊
-    def private(self):
+            else:
+                print("意外的返回消息类型 " + data_type)
+
+    # 私发消息
+    def private_message(self):
         clear()
-        target = input('输入聊天目标账号：')
+        target = input('输入目标账号：')
+        message = input('请输入消息内容：')
         ask_private_payload = {
             'account': self.account,
             'token': self.token,
             'target': target,
+            'message': message,
         }
         message_type, message_body = self.send(ask_private(ask_private_payload))
         if message_type == 'error':
@@ -196,8 +210,6 @@ class Client:
         if message_body != check_code(ask_private_payload):
             raise Exception("错误的消息校验码")
 
-        print('[ - ] 开始聊天吧~')
-
 
 server_ip = '127.0.0.1'
 server_port = 5000
@@ -205,13 +217,12 @@ server_port = 5000
 
 def start():
     client = Client(server_ip, server_port)
-    # 准备连接
-    message_type, message_body = client.send(connect())
-    if message_type != 'welcome':
-        raise Exception("意外的返回消息类型 " + message_type)
-    print("[ - ] 成功连接服务器")
-    print(message_body)
+    # 启动接收消息线程
+    group_thread = threading.Thread(target=client.receive_message_handler)
+    group_thread.start()
 
+    # 准备连接
+    client.send(connect())
     client.menu()
 
 
