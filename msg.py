@@ -46,9 +46,9 @@ def exit_group(data):
     return warp("exit_group", data)
 
 
-# 客户端发起私聊
-def ask_private(data):
-    return warp("ask_private", data)
+# 客户端发送私有消息
+def send_private(data):
+    return warp("send_private", data)
 
 
 # welcome 服务端欢迎信息

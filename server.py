@@ -32,6 +32,7 @@ UDP Server
         self.add_handler('enter_group', self.enter_group)
         self.add_handler('group_message', self.group_message)
         self.add_handler('exit_group', self.exit_group)
+        self.add_handler('send_private', self.send_private)
 
     # 返回消息给客户端
     def send_to(self, addr, data):
@@ -159,7 +160,7 @@ UDP Server
         return ok('exit_group', body)
 
     # Handler: 用户发送私有消息
-    def enter_private(self, addr, body):
+    def send_private(self, addr, body):
         account = body['account']
         token = body['token']
         target = body['target']
@@ -170,12 +171,15 @@ UDP Server
             return error("用户名不存在")
 
         # 判断该用户是否存在并登陆
-        if target not in self.user_data and self.user_data[account]['addr'] != '':
-            to_addr = self.user_data[account]['addr']
+        if target in self.user_data and self.user_data[account]['addr'] != '':
+            to_addr = self.user_data[target]['addr']
             self.send_to(to_addr, receive_private_message({
                 'from': account,
                 'message': message,
             }))
+        else:
+            print('用户 %s 发送私有消息给 %s: %s，发送失败！' % (account, target, message))
+            return
 
         print('用户 %s 发送私有消息给 %s: %s' % (account, target, message))
 

@@ -182,6 +182,12 @@ class Client:
                 print("[%s] %s: %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), receive_data['from'],
                                        receive_data['message']))
 
+            # 接收私有消息
+            elif data_type == 'receive_private_message':
+                from_account = receive_data['from']
+                message = receive_data['message']
+                print('收到来自 %s 的私有消息: %s' % (from_account, message))
+
             # 登录欢迎消息
             elif data_type == 'welcome':
                 print("[ - ] 成功连接服务器")
@@ -195,20 +201,14 @@ class Client:
         clear()
         target = input('输入目标账号：')
         message = input('请输入消息内容：')
-        ask_private_payload = {
+        send_private_payload = {
             'account': self.account,
             'token': self.token,
             'target': target,
             'message': message,
         }
-        message_type, message_body = self.send(ask_private(ask_private_payload))
-        if message_type == 'error':
-            print('[ x ] ' + message_body)
-            return
-        if message_type != 'ok':
-            raise Exception("意外的返回消息类型 " + message_type)
-        if message_body != check_code(ask_private_payload):
-            raise Exception("错误的消息校验码")
+        self.payload_queue.append(send_private_payload)
+        self.send(send_private(send_private_payload))
 
 
 server_ip = '127.0.0.1'
