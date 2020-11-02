@@ -62,7 +62,7 @@ UDP Server
 
         # 判断用户名是否重复
         if account in self.user_data:
-            return error("用户名重复，换一个名字吧~")
+            return error('register', "用户名重复，换一个名字吧~")
 
         # 存储用户信息
         self.user_data[account] = {'password': password}
@@ -76,7 +76,7 @@ UDP Server
 
         # 判断用户名是否重复
         if account not in self.user_data or self.user_data[account]['password'] != password:
-            return error("用户名或密码错误")
+            return error('login', "用户名或密码错误")
 
         # 签发用户 Token
         token = md5(str(time.time()) + account + self.salt)
@@ -96,7 +96,7 @@ UDP Server
 
         # 判断用户名，Token 是否正确
         if account not in self.user_data or self.user_data[account]['token'] != token:
-            return error("用户名不存在")
+            return error('auth', "用户名不存在")
 
         # 删除 Token
         del self.user_data[account]['token']
@@ -111,7 +111,7 @@ UDP Server
 
         # 判断用户名，Token 是否正确
         if account not in self.user_data or self.user_data[account]['token'] != token:
-            return error("用户名不存在")
+            return error('auth', "用户名不存在")
 
         # 添加当前用户添加到公共服务器中
         self.group_chat[account] = token
@@ -127,7 +127,7 @@ UDP Server
 
         # 判断用户名，Token 是否正确
         if account not in self.user_data or self.user_data[account]['token'] != token:
-            return error("用户名不存在")
+            return error('auth', "用户名不存在")
 
         # 如果当前用户意外不在群聊名单里，则加上
         self.group_chat[account] = token
@@ -150,7 +150,7 @@ UDP Server
 
         # 判断用户名，Token 是否正确
         if account not in self.user_data or self.user_data[account]['token'] != token:
-            return error("用户名不存在")
+            return error('auth', "用户名不存在")
 
         # 将当前用户从公共服务器中移除
         if account in self.group_chat:
@@ -168,7 +168,7 @@ UDP Server
 
         # 判断用户名，Token 是否正确
         if account not in self.user_data or self.user_data[account]['token'] != token:
-            return error("用户名不存在")
+            return error('auth', "用户名不存在")
 
         # 判断该用户是否存在并登陆
         if target in self.user_data and self.user_data[account]['addr'] != '':

@@ -65,8 +65,11 @@ def ok(msg_type, data):
 
 
 # 操作错误消息
-def error(msg):
-    return warp("error", msg)
+def error(error_type, msg):
+    return warp("error", {
+        'type': error_type,
+        'message': msg
+    })
 
 
 # 登录成功，返回 Token

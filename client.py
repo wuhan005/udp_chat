@@ -14,6 +14,8 @@ class Client:
     payload_queue = []
 
     # 多线程信号量
+    ready_signal = True  # 初始化完毕
+    register_signal = False  # 注册事件处理完毕
     login_signal = False  # 登录事件处理完毕
     logout_signal = False  # 登出事件处理完毕
 
@@ -27,11 +29,10 @@ class Client:
 
     def menu(self):
         while True:
-            clear()
             print("====菜单====")
-            print("1. 注册")
 
             if self.login_status is False:
+                print("1. 注册")
                 print("2. 登录")
             else:
                 print("2. 登出")
@@ -41,16 +42,20 @@ class Client:
             print("============")
 
             choice = input()
-            if choice == '1':
+            if choice == '1' and self.login_status is False:
                 self.register()
+                clear()
             elif choice == '2':
                 if self.login_status is False:
                     self.login()
                 else:
+                    clear()
                     self.logout()
             elif choice == '3' and self.login_status is True:
+                clear()
                 self.group()
             elif choice == '4' and self.login_status is True:
+                clear()
                 self.private_message()
 
     # 用户注册
@@ -65,6 +70,9 @@ class Client:
 
             self.payload_queue.append(register_payload)
             self.send(register(register_payload))
+            self.register_signal = True
+            while self.register_signal:
+                pass
             break
 
     # 用户登录
@@ -79,6 +87,7 @@ class Client:
         self.login_signal = True
         while self.login_signal:
             pass
+        clear()
 
     # 用户登出
     def logout(self):
@@ -87,6 +96,7 @@ class Client:
                 'account': self.account,
                 'token': self.token
             }
+            self.payload_queue.append(logout_payload)
             self.send(logout(logout_payload))
 
             self.logout_signal = True
@@ -102,8 +112,6 @@ class Client:
 
     # 群聊
     def group(self):
-        clear()
-
         if not self.login_status:
             raise Exception('未登录')
 
@@ -138,6 +146,21 @@ class Client:
         # 发送退出消息
         self.payload_queue.append(group_payload)
         self.send(exit_group(group_payload))
+        clear()
+
+    # 私发消息
+    def private_message(self):
+        target = input('输入目标账号：')
+        message = input('请输入消息内容：')
+        send_private_payload = {
+            'account': self.account,
+            'token': self.token,
+            'target': target,
+            'message': message,
+        }
+        self.payload_queue.append(send_private_payload)
+        self.send(send_private(send_private_payload))
+        clear()
 
     # 接受服务端消息处理器
     def receive_message_handler(self):
@@ -155,6 +178,9 @@ class Client:
                         del self.payload_queue[i]
                         break
 
+                if receive_data['type'] == 'register':
+                    self.register_signal = False
+
                 if receive_data['type'] == 'logout':
                     self.logout_signal = False
 
@@ -163,10 +189,23 @@ class Client:
 
             # 错误消息
             elif data_type == 'error':
-                # FIXME dirty code
-                if receive_data == '用户名或密码错误':
+                error_type = receive_data['type']
+                error_message = receive_data['message']
+                if error_type == 'login':
+                    print('[ x ] ' + error_message)
+                    time.sleep(2)
                     self.login_signal = False  # 更新信号量
-                print('[ x ] ' + receive_data)
+                elif error_type == 'register':
+                    print('[ x ] ' + error_message)
+                    time.sleep(2)
+                    self.register_signal = False  # 更新信号量
+                elif error_type == 'logout':
+                    print('[ x ] ' + error_message)
+                    time.sleep(2)
+                    self.logout_signal = False  # 更新信号量
+                else:
+                    print('[ x ] ' + error_message)
+
 
             # 接收到服务器下发的 Token
             elif data_type == 'send_token':
@@ -174,8 +213,9 @@ class Client:
                 self.account = receive_data['account']
                 self.token = receive_data['token']
                 self.login_status = True
+                print('[ - ] 登录成功...')
+                time.sleep(1)
                 self.login_signal = False  # 更新信号量
-                print('[ - ] 登录成功')
 
             # 进入群聊后接收群聊消息
             elif data_type == 'receive_group_message' and self.group_status:
@@ -192,23 +232,10 @@ class Client:
             elif data_type == 'welcome':
                 print("[ - ] 成功连接服务器")
                 print(receive_data)
+                self.ready_signal = False
 
             else:
                 print("意外的返回消息类型 " + data_type)
-
-    # 私发消息
-    def private_message(self):
-        clear()
-        target = input('输入目标账号：')
-        message = input('请输入消息内容：')
-        send_private_payload = {
-            'account': self.account,
-            'token': self.token,
-            'target': target,
-            'message': message,
-        }
-        self.payload_queue.append(send_private_payload)
-        self.send(send_private(send_private_payload))
 
 
 server_ip = '127.0.0.1'
@@ -223,6 +250,8 @@ def start():
 
     # 准备连接
     client.send(connect())
+    while client.ready_signal:
+        pass
     client.menu()
 
 
